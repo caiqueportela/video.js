@@ -43,47 +43,35 @@ class SeekBar extends Slider {
    */
   constructor(player, options) {
     super(player, options);
+    this.setEventHandlers_();
+  }
 
+  /**
+   * Sets the event handlers
+   *
+   * @private
+   */
+  setEventHandlers_() {
     this.update_ = Fn.bind(this, this.update);
     this.update = Fn.throttle(this.update_, UPDATE_REFRESH_INTERVAL);
 
+    this.on(this.player_, ['ended', 'durationchange', 'timeupdate'], this.update);
     if (this.player_.liveTracker) {
       this.on(this.player_.liveTracker, 'liveedgechange', this.update);
     }
 
-    this.on(this.player_, 'durationchange', function() {
-      const isLive = this.player_.duration() === Infinity;
-
-      // going from not live to live
-      if (!this.wasLive_ && isLive) {
-        this.doEventHandlers_('off');
-        // going from live to not live
-      } else if (this.wasLive_ && !isLive) {
-        this.doEventHandlers_('on');
-      }
-
-      this.wasLive_ = isLive;
-    });
-  }
-
-  doEventHandlers_(fn) {
-    this[fn](this.player_, ['ended', 'durationchange', 'timeupdate'], this.update);
-
     // when playing, let's ensure we smoothly update the play progress bar
     // via an interval
-    if (fn === 'off') {
-      this.disableInterval_();
-    } else {
-      this.enableInterval_();
-    }
+    this.updateInterval = null;
 
-    this[fn](this.player_, ['playing'], this.enableInterval_);
-    this[fn](this.player_, ['ended', 'pause', 'waiting'], this.disableInterval_);
+    this.on(this.player_, ['playing'], this.enableInterval_);
+
+    this.on(this.player_, ['ended', 'pause', 'waiting'], this.disableInterval_);
 
     // we don't need to update the play progress if the document is hidden,
     // also, this causes the CPU to spike and eventually crash the page on IE11.
     if ('hidden' in document && 'visibilityState' in document) {
-      this[fn](document, 'visibilitychange', this.toggleVisibility_);
+      this.on(document, 'visibilitychange', this.toggleVisibility_);
     }
   }
 
@@ -107,6 +95,10 @@ class SeekBar extends Slider {
   }
 
   disableInterval_(e) {
+    if (this.player_.liveTracker && this.player_.liveTracker.isLive() && e.type !== 'ended') {
+      return;
+    }
+
     if (!this.updateInterval) {
       return;
     }
