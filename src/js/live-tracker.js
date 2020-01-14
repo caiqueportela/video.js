@@ -1,5 +1,4 @@
 import Component from './component.js';
-import clamp from './utils/clamp.js';
 import mergeOptions from './utils/merge-options.js';
 import document from 'global/document';
 import * as browser from './utils/browser.js';
@@ -53,13 +52,12 @@ class LiveTracker extends Component {
 
     this.lastTime_ = newTime;
 
-    // prevent pastSeekEnd_ from going negative
-    this.pastSeekEnd_ = clamp(this.pastSeekEnd() + deltaTime, 0, Infinity);
+    this.pastSeekEnd_ = this.pastSeekEnd() + deltaTime;
 
     const liveCurrentTime = this.liveCurrentTime();
     const currentTime = this.player_.currentTime();
     // we are behind live if the difference between live and current time
-    // is greater than 3 segments
+    // is greater liveTolerance which defaults to 15s
     let isBehind = Math.abs(liveCurrentTime - currentTime) > this.options_.liveTolerance;
 
     // we cannot be behind if
