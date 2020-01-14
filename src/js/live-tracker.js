@@ -1,5 +1,4 @@
 import Component from './component.js';
-import median from './utils/median.js';
 import clamp from './utils/clamp.js';
 import mergeOptions from './utils/merge-options.js';
 import document from 'global/document';
@@ -11,7 +10,7 @@ class LiveTracker extends Component {
 
   constructor(player, options) {
     // LiveTracker does not need an element
-    const options_ = mergeOptions({createEl: false}, options);
+    const options_ = mergeOptions({createEl: false, liveTolerance: 15}, options);
 
     super(player, options_);
 
@@ -49,8 +48,8 @@ class LiveTracker extends Component {
       return;
     }
 
-    const newTime = window.performance.now();
-    const deltaTime = (newTime - this.lastTime_) / 1000;
+    const newTime = window.performance.now().toFixed(4);
+    const deltaTime = !this.lastTime_ ? 0 : (newTime - this.lastTime_) / 1000;
 
     this.lastTime_ = newTime;
 
@@ -61,7 +60,7 @@ class LiveTracker extends Component {
     const currentTime = this.player_.currentTime();
     // we are behind live if the difference between live and current time
     // is greater than 3 segments
-    let isBehind = Math.abs(liveCurrentTime - currentTime) > this.seekableIncrement_ * 3;
+    let isBehind = Math.abs(liveCurrentTime - currentTime) > this.options_.liveTolerance;
 
     // we cannot be behind if
     // 1. until we have not seen a timeupdate yet
@@ -103,7 +102,6 @@ class LiveTracker extends Component {
       this.timeupdateSeen_ = this.player_.hasStarted();
     }
 
-    this.lastTime_ = window.performance.now() / 1000;
     this.trackingInterval_ = this.setInterval(this.trackLive_, 30);
     this.trackLive_();
 
@@ -139,8 +137,6 @@ class LiveTracker extends Component {
 
     this.clearInterval(this.trackingInterval_);
     this.trackingInterval_ = null;
-    this.seekableIncrement_ = 12;
-    this.seekableIncrementList_ = [];
 
     this.off(this.player_, 'play', this.trackLive_);
     this.off(this.player_, 'pause', this.trackLive_);
@@ -242,15 +238,6 @@ class LiveTracker extends Component {
     const seekableEnd = this.seekableEnd();
 
     if (typeof this.lastSeekEnd_ === 'number' && seekableEnd !== this.lastSeekEnd_) {
-      if (seekableEnd > this.lastSeekEnd_) {
-        // we try to get the best fit value for the seeking increment
-        // variable from the last 12 values.
-        this.seekableIncrementList_ = this.seekableIncrementList_.slice(-11);
-        this.seekableIncrementList_.push(seekableEnd - this.lastSeekEnd_);
-        if (this.seekableIncrementList_.length > 3) {
-          this.seekableIncrement_ = median(this.seekableIncrementList_);
-        }
-      }
       this.pastSeekEnd_ = 0;
     }
     this.lastSeekEnd_ = seekableEnd;
